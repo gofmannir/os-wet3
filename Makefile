@@ -29,6 +29,9 @@ output.cgi: output.c
 .c.o:
 	$(CC) $(CFLAGS) -o $@ -c $<
 
+test: test.c
+	$(CC) $(CFLAGS) -o test test.c $(LIBS)
+
 clean:
 	-rm -f $(OBJS) server client output.cgi
 	-rm -rf public

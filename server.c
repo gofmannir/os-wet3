@@ -51,6 +51,8 @@ int queue_rear = 0;
 
 int active_requests = 0;
 
+server_log log_requests;
+
 
 void* worker_thread(void *arg) {
     // Worker thread function to process requests from the queue
@@ -62,7 +64,7 @@ void* worker_thread(void *arg) {
         request_t req = dequeue_request();
         struct timeval dispatch_time;
         gettimeofday(&dispatch_time, NULL);
-        requestHandle(req.connfd, req.arrival_time, dispatch_time, t, log);
+        requestHandle(req.connfd, req.arrival_time, dispatch_time, t, log_requests);
         Close(req.connfd);
 
         // lock again for reducing active requests
@@ -118,7 +120,6 @@ int main(int argc, char *argv[])
 {
     int listenfd, connfd, port, threads, clientlen;
     struct sockaddr_in clientaddr;
-
     getargs(&port, &threads, &QUEUE_MAX_SIZE, argc, argv);
 
     pthread_t* thread_pool = malloc(sizeof(pthread_t) * threads);
@@ -131,6 +132,8 @@ int main(int argc, char *argv[])
         thread_stats_array[i].total_req = 0;
         pthread_create(&thread_pool[i], NULL, worker_thread, &thread_stats_array[i]);
     }
+
+    log_requests = create_log();
 
     pthread_mutex_init(&queue_mutex, NULL);
     pthread_cond_init(&queue_not_full, NULL);
@@ -183,7 +186,7 @@ int main(int argc, char *argv[])
     }
 
     // Clean up the server log before exiting
-    destroy_log(log);
+    destroy_log(log_requests);
 
     free(request_queue);
     free(thread_pool);
