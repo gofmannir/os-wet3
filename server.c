@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
     printf("allocated all statssssss \n");
     request_queue = malloc(sizeof(struct request_t) * QUEUE_MAX_SIZE);
 
-    for (int i = 0; i <= threads; i++) {
+    for (int i = 0; i < threads; i++) {
         thread_stats_array[i].id = i+1;
         thread_stats_array[i].stat_req = 0;
         thread_stats_array[i].dynm_req = 0;
