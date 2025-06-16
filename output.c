@@ -10,7 +10,7 @@
 // handling http requests.
 // 
 
-double spinfor = 5.0;
+double spinfor = 0.5;
 
 void getargs()
 {
@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
 
   double t1 = Time_GetSeconds();
   usleep(spinfor * 1e6);
+//   usleep(20 * 1e6); // Spin for 5 seconds as per the original intent
   double t2 = Time_GetSeconds();
 
   /* Make the response body */

@@ -1,6 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+#include <sys/time.h>
+#include <unistd.h>
+#include "segel.h"
+
 #include "reader_writer.c"
 #include "log.h"
 #define INITIAL_CAPACITY 1024
@@ -59,10 +64,9 @@ int get_log(server_log log, char** dst) {
 
 // Appends a new entry to the log (no-op stub)
 void add_to_log(server_log log, const char* data, int data_len) {
-    printf("add_to_log called with data_len: %d\n", data_len);
-    printf("add_to_log called with data: %.*s\n", data_len, data);
     if (!log || !data || data_len <= 0) return;
     writers_lock();
+
     if (log->length + data_len + 1 > log->capacity) {
         int new_capacity = (log->length + data_len + 1) * 2;
         char* new_buf = realloc(log->buffer, new_capacity);
@@ -73,6 +77,9 @@ void add_to_log(server_log log, const char* data, int data_len) {
         log->buffer = new_buf;
         log->capacity = new_capacity;
     }
+    
+    usleep(200000);
+
     memcpy(log->buffer + log->length, data, data_len);
     log->length += data_len;
     log->buffer[log->length] = '\0';
