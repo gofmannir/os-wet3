@@ -239,7 +239,7 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         }
 
         // TODO: add log entry using add_to_log(server_log log, const char* data, int data_len);
-        char stats_buf[MAXLINE];
+        char stats_buf[MAXLINE] = {0};
         int len = append_stats(stats_buf, t_stats, arrival, dispatch);
         add_to_log(log, stats_buf, len);
 

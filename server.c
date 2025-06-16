@@ -28,7 +28,7 @@ void getargs(int *port, int *threads, int *queue_size, int argc, char *argv[]) {
 // You must implement a thread pool (fixed number of worker threads)
 // that process requests from a synchronized queue.
 
-typedef struct {
+typedef struct request_t {
     // holds the information to be served by the thread
     int connfd;
     struct timeval arrival_time;
@@ -37,7 +37,7 @@ typedef struct {
 request_t dequeue_request();
 void enqueue_request(request_t req);
 
-request_t* request_queue; // This should be a synchronized queue
+struct request_t* request_queue = NULL; // This should be a synchronized queue
 pthread_mutex_t queue_mutex;
 pthread_cond_t queue_not_full;
 pthread_cond_t queue_not_empty;
@@ -118,12 +118,20 @@ request_t dequeue_request() {
 
 int main(int argc, char *argv[])
 {
+    printf("reading args\n");
     int listenfd, connfd, port, threads, clientlen;
     struct sockaddr_in clientaddr;
     getargs(&port, &threads, &QUEUE_MAX_SIZE, argc, argv);
 
+    printf("allocating threadssssss \n");
     pthread_t* thread_pool = malloc(sizeof(pthread_t) * threads);
+
+    printf("allocating thread statssssss \n");
     struct Threads_stats *thread_stats_array = malloc(sizeof(struct Threads_stats) * threads);
+
+    printf("allocated all statssssss \n");
+    request_queue = malloc(sizeof(struct request_t) * QUEUE_MAX_SIZE);
+
     for (int i = 0; i <= threads; i++) {
         thread_stats_array[i].id = i+1;
         thread_stats_array[i].stat_req = 0;
@@ -133,13 +141,16 @@ int main(int argc, char *argv[])
         pthread_create(&thread_pool[i], NULL, worker_thread, &thread_stats_array[i]);
     }
 
-    log_requests = create_log();
+    printf("created all threadssss \n");
 
+    log_requests = create_log();
+    printf("created log \n");
     pthread_mutex_init(&queue_mutex, NULL);
     pthread_cond_init(&queue_not_full, NULL);
     pthread_cond_init(&queue_not_empty, NULL);
-    request_queue = malloc(sizeof(request_t) * QUEUE_MAX_SIZE);
 
+    printf("initialized mutex and conds %d \n", QUEUE_MAX_SIZE);
+    printf("allocated request queue \n");
 
     listenfd = Open_listenfd(port);
     while (1) {
