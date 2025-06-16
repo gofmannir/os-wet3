@@ -2,6 +2,7 @@
 #include "request.h"
 #include "log.h"
 #include <pthread.h>
+#include <semaphore.h>
 
 //
 // server.c: A very, very simple web server
@@ -45,6 +46,8 @@ pthread_cond_t queue_not_empty;
 // create a queue to hold requests
 int QUEUE_MAX_SIZE;
 int queue_current_size = 0;
+sem_t queue_size;
+sem_t active_requests_sem; // semaphore to control
 // for fifo handling
 int queue_front = 0;
 int queue_rear = 0;
@@ -67,50 +70,73 @@ void* worker_thread(void *arg) {
         requestHandle(req.connfd, req.arrival_time, dispatch_time, t, log_requests);
         Close(req.connfd);
 
+        sem_post(&queue_size); // signal that a request has been processed
         // lock again for reducing active requests
-        pthread_mutex_lock(&queue_mutex);
-        active_requests--;
-        pthread_cond_signal(&queue_not_full);
-        pthread_mutex_unlock(&queue_mutex);
+        // pthread_mutex_lock(&queue_mutex);
+        // active_requests--;
+        // pthread_cond_signal(&queue_not_full);
+        // pthread_mutex_unlock(&queue_mutex);
     }
 }
 
 void enqueue_request(request_t req) {
     // when appending we should wait if the queue is full
     // threads are editting the queue variables thus, we should protext with lock
+    printf("Enqueuing request:");
+
+    sem_wait(&queue_size); // signal that a request is available in the queue
+    printf("sem_wait finished ");
     pthread_mutex_lock(&queue_mutex);
+    printf("pthread_mutex_lock finished ");
 
     // wait for a signal if the queue is full
-    while (QUEUE_MAX_SIZE == queue_current_size + active_requests) { // while the queue is full we will wait
-        pthread_cond_wait(&queue_not_full, &queue_mutex);
-        // who is sending the signal? - a thread that finishes handling a request
-    }
+    // while (QUEUE_MAX_SIZE <= queue_current_size + active_requests) { // while the queue is full we will wait
+    //     pthread_cond_wait(&queue_not_full, &queue_mutex);
+    //     // who is sending the signal? - a thread that finishes handling a request
+    // }
 
     // append to the queue
     request_queue[queue_rear] = req;
     queue_rear = (queue_rear + 1) % QUEUE_MAX_SIZE;
-    queue_current_size++;
+    // queue_current_size++;
     
     // if this is the furst request, we should awake waiting threads
     // we cand use busy waiting, thus, we will signal the condition variable
-    pthread_cond_signal(&queue_not_empty);
+    // pthread_cond_signal(&queue_not_empty);
+    // printf("pthread_cond_signal finished ");
+
     pthread_mutex_unlock(&queue_mutex);
+
+    sem_post(&active_requests_sem); // signal that an active request is available
 }
 
 
 request_t dequeue_request() {
+    printf("starting dequeue_request\n");
+    // int sem_value;
+    // sem_getvalue(&queue_size, &sem_value);
+    // printf("sem_value before dequeue: %d\n", sem_value);
+    // while (sem_value == QUEUE_MAX_SIZE) {
+    //     printf("waiting for queue to have requests, sem_value: \n");
+    //     printf("%d\n", sem_value);
+    //     pthread_cond_wait(&queue_not_empty, &queue_mutex);
+    //     sem_getvalue(&queue_size, &sem_value);
+    // }
+
+    sem_wait(&active_requests_sem); // wait for an active request to be available
+
     pthread_mutex_lock(&queue_mutex);
 
-    while (queue_current_size == 0) {
-        pthread_cond_wait(&queue_not_empty, &queue_mutex);
-    }
+    // while (queue_current_size == 0) {
+    //     pthread_cond_wait(&queue_not_empty, &queue_mutex);
+    // }
 
     request_t req = request_queue[queue_front];
     queue_front = (queue_front + 1) % QUEUE_MAX_SIZE;
-    queue_current_size--; // TODO: check to reduce only when request is finished
-    active_requests++; // maybe redundent
+    // queue_current_size--; // TODO: check to reduce only when request is finished
+    // active_requests++; // maybe redundent
 
-    pthread_cond_signal(&queue_not_full);
+    // pthread_cond_signal(&queue_not_full);
     pthread_mutex_unlock(&queue_mutex);
 
     return req;
@@ -118,18 +144,16 @@ request_t dequeue_request() {
 
 int main(int argc, char *argv[])
 {
-    printf("reading args\n");
     int listenfd, connfd, port, threads, clientlen;
     struct sockaddr_in clientaddr;
     getargs(&port, &threads, &QUEUE_MAX_SIZE, argc, argv);
 
-    printf("allocating threadssssss \n");
+    sem_init(&queue_size, 0, QUEUE_MAX_SIZE);
+    sem_init(&active_requests_sem, 0, 0);
     pthread_t* thread_pool = malloc(sizeof(pthread_t) * threads);
 
-    printf("allocating thread statssssss \n");
     struct Threads_stats *thread_stats_array = malloc(sizeof(struct Threads_stats) * threads);
 
-    printf("allocated all statssssss \n");
     request_queue = malloc(sizeof(struct request_t) * QUEUE_MAX_SIZE);
 
     for (int i = 0; i < threads; i++) {
@@ -141,16 +165,11 @@ int main(int argc, char *argv[])
         pthread_create(&thread_pool[i], NULL, worker_thread, &thread_stats_array[i]);
     }
 
-    printf("created all threadssss \n");
 
     log_requests = create_log();
-    printf("created log \n");
     pthread_mutex_init(&queue_mutex, NULL);
     pthread_cond_init(&queue_not_full, NULL);
     pthread_cond_init(&queue_not_empty, NULL);
-
-    printf("initialized mutex and conds %d \n", QUEUE_MAX_SIZE);
-    printf("allocated request queue \n");
 
     listenfd = Open_listenfd(port);
     while (1) {
@@ -181,8 +200,7 @@ int main(int argc, char *argv[])
         request_t req;
         req.connfd = connfd;
         req.arrival_time = arrival_time;
-
-        printf("New connection: %d\n", connfd);
+        printf("enqueue_request \n");
         enqueue_request(req);
         // Call the request handler (immediate in main thread — DEMO ONLY)
         // requestHandle(connfd, arrival, dispatch, t, log);
