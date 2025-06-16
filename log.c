@@ -77,14 +77,9 @@ void add_to_log(server_log log, const char* data, int data_len) {
         log->buffer = new_buf;
         log->capacity = new_capacity;
     }
-    
-    usleep(200000);
 
     memcpy(log->buffer + log->length, data, data_len);
     log->length += data_len;
     log->buffer[log->length] = '\0';
-    printf("Log updated, new length: %d\n", log->length);
-    // current log: 
-    printf("Current log: %s\n", log->buffer);
     writers_unlock();
 }

@@ -208,20 +208,7 @@ class Responses(typing.NamedTuple):
 
 
 class TestServer:
-    STAGGER = 0.1
-
-    @staticmethod
-    def assert_close_times(
-        actual: list[float], expected: list[float], eps: float | None = None
-    ):
-        eps = eps or CGI_SPINFOR / 2
-
-        assert len(expected) == len(actual), "missmatched amount of times"
-
-        actual = [a - actual[0] for a in actual]
-
-        for i, (a, e) in enumerate(zip(actual, expected)):
-            assert abs(a - e) < eps, f"Time {i} diff:\nact={actual}\nexp={expected}"
+    STAGGER = 0.01
 
     def parse_headers(self, response: httpx.Response) -> ResponseStats:
         headers = response.headers
@@ -320,14 +307,11 @@ class TestServer:
         headers = responses.headers
 
         arrival = [h.StatReqArrival for h in headers]
-        dispatch = [h.StatReqDispatch for h in headers]
 
         indices = list(range(len(headers)))
         sorted_arrival = list(sorted(zip(arrival, indices)))
-        sorted_dispatch = list(sorted(zip(dispatch, indices)))
 
         assert [s[1] for s in sorted_arrival] == indices, sorted_arrival
-        assert [s[1] for s in sorted_dispatch] == indices, sorted_dispatch
 
     @pytest.mark.parametrize(
         "responses",
@@ -350,8 +334,7 @@ class TestServer:
             arrival = headers.StatReqArrival
             dispatch = headers.StatReqDispatch
 
-            diff = dispatch - arrival
-            assert diff <= 0.1, f"Request {i} processed after {diff:.3f}s"
+            assert dispatch <= 0.1, f"Request {i} processed after {dispatch:.3f}s"
 
     @pytest.mark.parametrize(
         "responses",
@@ -361,19 +344,40 @@ class TestServer:
                 queue_size=5,
                 batches=[[*repeat(dict(method="GET", url="home.html"), 5)]],
             ),
+            dict(
+                threads=1,
+                queue_size=5,
+                batches=[[*repeat(dict(method="GET", url="output.cgi"), 5)]],
+            ),
+            dict(
+                threads=1,
+                queue_size=5,
+                batches=[[*repeat(dict(method="POST"), 5)]],
+            ),
         ],
         indirect=["responses"],
     )
     def test_blocks_when_no_workers_available(self, responses: Responses):
-        self.assert_close_times(
-            actual=[h.StatReqArrival for h in responses.headers],
-            expected=[self.STAGGER * i for i in range(len(responses.headers))],
-        )
+        eps = CGI_SPINFOR / 2
+        first_arrival = responses.headers[0].StatReqArrival
 
-        self.assert_close_times(
-            actual=[h.StatReqDispatch for h in responses.headers],
-            expected=[i * ADD_LOG_SLEEP for i in range(len(responses.headers))],
-        )
+        arrivals = [h.StatReqArrival - first_arrival for h in responses.headers]
+        dispatches = [h.StatReqDispatch for h in responses.headers]
+        for i, h in enumerate(responses.headers):
+            req = h.response.request
+
+            process_time = 0
+            if req.method == "GET":
+                process_time += ADD_LOG_SLEEP
+
+                if "cgi" in req.url.path:
+                    process_time += CGI_SPINFOR
+
+            arrival_diff = abs(self.STAGGER * i - arrivals[i])
+            dispatch_diff = abs(process_time * i - dispatches[i])
+
+            assert arrival_diff < eps, f"{i=} arrivals: {arrivals}"
+            assert dispatch_diff < eps, f" {i=} dispatches: {dispatches}"
 
     @pytest.mark.parametrize(
         "responses",
@@ -554,6 +558,7 @@ class TestServer:
     def test_pending_and_active_le_queue_size(self, responses: Responses):
         """
         PIAZZA: https://piazza.com/class/m8nd0nnxsj77dt/post/382_f2
+        PIAZZA: https://piazza.com/class/m8nd0nnxsj77dt/post/373
 
         If staff replies that we need option:
             A - this test should FAIL
@@ -652,6 +657,11 @@ class TestServer:
     def test_log_writer_locks_first_after_write_lock_released(
         self, responses: Responses
     ):
+        """
+        PIAZZA: https://piazza.com/class/m8nd0nnxsj77dt/post/377
+
+        Do we need to add a delimiter?
+        """
         writer_0 = responses.headers[0]
         readers = responses.headers[1:-2]
         writer_1 = responses.headers[-2]
