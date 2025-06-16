@@ -124,8 +124,8 @@ int main(int argc, char *argv[])
 
     pthread_t* thread_pool = malloc(sizeof(pthread_t) * threads);
     struct Threads_stats *thread_stats_array = malloc(sizeof(struct Threads_stats) * threads);
-    for (int i = 1; i <= threads; i++) {
-        thread_stats_array[i].id = i;
+    for (int i = 0; i <= threads; i++) {
+        thread_stats_array[i].id = i+1;
         thread_stats_array[i].stat_req = 0;
         thread_stats_array[i].dynm_req = 0;
         thread_stats_array[i].post_req = 0;
