@@ -80,6 +80,8 @@ void add_to_log(server_log log, const char* data, int data_len) {
 
     memcpy(log->buffer + log->length, data, data_len);
     log->length += data_len;
+    // Add newline after the copied data
+    log->buffer[log->length++] = '\n';
     log->buffer[log->length] = '\0';
     writers_unlock();
 }
