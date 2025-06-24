@@ -1,2 +1,9 @@
 .idea
 *.o
+test_folder
+*.txt
+!submitters.txt
+*.py
+__pycache__
+.venv
+*.zip
