@@ -67,6 +67,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
     if (!log || !data || data_len <= 0) return;
     writers_lock();
 
+    // usleep(200000);
     if (log->length + data_len + 1 > log->capacity) {
         int new_capacity = (log->length + data_len + 1) * 2;
         char* new_buf = realloc(log->buffer, new_capacity);

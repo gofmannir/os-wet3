@@ -176,7 +176,10 @@ void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, 
 {
     char header[MAXBUF], *body = NULL;
     int body_len = get_log(log, &body);
-    body_len = body_len - 1; // remove the last new line
+	// printf("original len: %d\n", body_len);
+    if (body_len > 0){
+        body_len = body_len - 1; // remove the last new line
+    }
     // put together response
     sprintf(header, "HTTP/1.0 200 OK\r\n");
     sprintf(header, "%sServer: OS-HW3 Web Server\r\n", header);
